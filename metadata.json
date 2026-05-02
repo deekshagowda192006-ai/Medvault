@@ -1,0 +1,8 @@
+{
+  "name": "MedVault",
+  "description": "A portable digital health record system for patients and doctors.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": []
+}

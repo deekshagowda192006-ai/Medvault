@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function getUserRole(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data.role;
+    }
+
+    function isSharingEnabled(patientId) {
+      return get(/databases/$(database)/documents/users/$(patientId)).data.sharingEnabled == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || (isSignedIn() && getUserRole(request.auth.uid) == 'doctor' && isSharingEnabled(userId));
+      allow create: if isOwner(userId) && request.resource.data.role in ['patient', 'doctor'];
+      allow update: if isOwner(userId) && request.resource.data.role == resource.data.role;
+    }
+
+    match /records/{recordId} {
+      allow read: if isOwner(resource.data.patientId) || (isSignedIn() && getUserRole(request.auth.uid) == 'doctor' && isSharingEnabled(resource.data.patientId));
+      allow list: if isOwner(resource.data.patientId) || (isSignedIn() && getUserRole(request.auth.uid) == 'doctor' && isSharingEnabled(resource.data.patientId));
+      allow create: if isOwner(request.resource.data.patientId) && request.resource.data.type in ['prescription', 'report'];
+      allow delete: if isOwner(resource.data.patientId);
+    }
+
+    match /reminders/{reminderId} {
+      allow read, write: if isOwner(request.resource.data.userId || resource.data.userId);
+    }
+  }
+}
